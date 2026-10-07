@@ -102,3 +102,32 @@ def test_decimal_negation_does_not_round_to_six_places(ctx):
     out=ctx.ns['build_document'](l,s['sales_credit_memo_header'],'CREDIT_MEMO')
     assert out.first().signed_amount_excl_vat==-value
     assert out.schema['signed_amount_excl_vat'].dataType.scale==20
+
+
+def test_comment_default_date_uses_header_and_preserves_lineage(ctx):
+    s=sources(ctx)
+    lines=(s['sales_invoice_line'].filter("document_no = 'A' AND line_no = 1")
+           .withColumn('type',F.lit(0))
+           .withColumn('posting_date',F.lit(datetime(1753,1,1)))
+           .withColumn('amount',F.lit(Decimal('0')).cast('decimal(38,20)')))
+    fact=ctx.ns['build_document'](lines,s['sales_invoice_header'],'INVOICE')
+    row=fact.first()
+    assert row.posting_date==date(2024,2,29)
+    assert row.source_line_posting_date==date(1753,1,1)
+    assert row.line_posting_date_defaulted is True
+    assert row.is_financial_line is False
+    ctx.ns['reconcile_document'](lines,s['sales_invoice_header'],fact,'INVOICE')
+
+
+@pytest.mark.parametrize('line_type,line_date',[
+    (2,datetime(1753,1,1)),  # Financial line cannot use the comment exception.
+    (0,datetime(2024,3,1)), # Ordinary conflicting comment dates still fail.
+    (0,None),             # An unexplained null is not the observed sentinel.
+])
+def test_comment_date_exception_remains_narrow(ctx,line_type,line_date):
+    s=sources(ctx)
+    lines=(s['sales_invoice_line'].limit(1)
+           .withColumn('type',F.lit(line_type))
+           .withColumn('posting_date',F.lit(line_date).cast('timestamp')))
+    with pytest.raises(ValueError,match='posting dates differ'):
+        ctx.ns['build_document'](lines,s['sales_invoice_header'],'INVOICE')

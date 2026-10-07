@@ -24,7 +24,10 @@ After reviewing the results and the business rules in the notebook, set
 
 - Grain: one company/document type/document number/line number. Full replacement.
 - Posting date and document salesperson come from the header. Inconsistent line/header
-  dates or customer attribution fail before publication.
+  dates or customer attribution fail before publication, except type 0 comment lines
+  whose line date is exactly `1753-01-01`. These use the valid header posting date,
+  retain `source_line_posting_date`, and set `line_posting_date_defaulted = true`.
+  Null dates and other date mismatches still fail, including on comment lines.
 - Credit amounts and quantities are negated, including negative correction lines.
   Original values are retained. No absolute-value conversion is applied.
 - Pre-VAT and VAT-inclusive amounts remain separate. Amounts stay in document
@@ -55,10 +58,11 @@ provides the first posted-sales foundation, not complete parity with the existin
 
 ## Verification
 
-Ten synthetic tests passed using local PySpark 3.5.3. They cover end-to-end transformation
+Fourteen synthetic tests passed using local PySpark 3.5.3. They cover end-to-end transformation
 and reconciliation, overlapping invoice/credit numbers, negative credits, decimal
 precision, placeholder members, leap dates, and rejection of duplicate keys, orphan
-lines, inconsistent dates/customers, null amounts, missing columns and altered totals.
+lines, inconsistent dates/customers, null amounts, missing columns and altered totals. Regression tests also cover the observed comment-line
+default date and rejection of financial sentinel dates, null dates and other mismatches.
 Notebook structure and every code cell were also validated locally.
 
 Fabric lakehouse permissions, Delta source access, destination writes and audit
