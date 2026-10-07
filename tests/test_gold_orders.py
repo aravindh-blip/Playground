@@ -1,4 +1,4 @@
-"""Open-order boundary, enrichment and shared-dimension tests for Gold v2."""
+"""Open-order boundary, enrichment and shared-dimension tests for the maintained Gold notebook."""
 from datetime import datetime, date
 from decimal import Decimal, localcontext, ROUND_HALF_UP
 from pathlib import Path
@@ -16,11 +16,11 @@ def ctx(tmp_path_factory):
            .config('spark.sql.warehouse.dir',str(tmp_path_factory.mktemp('warehouse-orders')))
            .config('spark.driver.bindAddress','127.0.0.1').getOrCreate())
     spark.sparkContext.setLogLevel('ERROR')
-    n=json.loads((Path(__file__).parents[1]/'notebooks/Silver_to_Gold_v2_Sales_and_Orders.ipynb').read_text())
+    n=json.loads((Path(__file__).parents[1]/'notebooks/Silver_to_Gold_v1_Posted_Sales.ipynb').read_text())
     ns={'spark':spark}
     for c in n['cells']:
         if c['cell_type']=='code' and 'definitions' in c['metadata'].get('tags',[]):
-            exec(compile(''.join(c['source']),'gold-v2-cell','exec'),ns)
+            exec(compile(''.join(c['source']),'gold-cell','exec'),ns)
     ns['configure_spark']()
     yield SimpleNamespace(spark=spark,ns=ns)
     spark.stop()
@@ -80,7 +80,7 @@ def test_all_open_measures_share_threshold_and_sni_is_separate(ctx):
     assert next(r for r in shipped if r.line_no==6).remaining_quantity==Decimal('0')
 
 
-def test_complete_v2_covers_order_only_dimensions_and_future_dates(ctx):
+def test_complete_gold_covers_order_only_dimensions_and_future_dates(ctx):
     out=ctx.ns['build_gold'](sources(ctx))
     try:
         assert len(out)==7 and out['fact_posted_sales'].count()==5

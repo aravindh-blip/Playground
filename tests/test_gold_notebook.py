@@ -50,7 +50,8 @@ def sources(ctx):
 
 
 def test_complete_gold_reconciles_and_preserves_keys(ctx):
-    out=ctx.ns['build_gold'](sources(ctx))
+    from test_gold_orders import sources as sources_with_orders
+    out=ctx.ns['build_gold'](sources_with_orders(ctx))
     try:
         fact=out['fact_posted_sales']
         assert fact.count()==5
