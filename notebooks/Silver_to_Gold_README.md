@@ -28,6 +28,10 @@ After reviewing the results and the business rules in the notebook, set
   whose line date is exactly `1753-01-01`. These use the valid header posting date,
   retain `source_line_posting_date`, and set `line_posting_date_defaulted = true`.
   Null dates and other date mismatches still fail, including on comment lines.
+- A blank/null bill-to or sell-to code on a type 0 comment line can use a populated
+  header customer, independently of the date rule. The original line codes and
+  separate `bill_to_customer_defaulted` / `sell_to_customer_defaulted` flags are saved.
+  Populated conflicting codes and customer mismatches on financial lines still fail.
 - Credit amounts and quantities are negated, including negative correction lines.
   Original values are retained. No absolute-value conversion is applied.
 - Pre-VAT and VAT-inclusive amounts remain separate. Amounts stay in document
@@ -58,11 +62,12 @@ provides the first posted-sales foundation, not complete parity with the existin
 
 ## Verification
 
-Fourteen synthetic tests passed using local PySpark 3.5.3. They cover end-to-end transformation
+Twenty-three synthetic tests passed using local PySpark 3.5.3. They cover end-to-end transformation
 and reconciliation, overlapping invoice/credit numbers, negative credits, decimal
 precision, placeholder members, leap dates, and rejection of duplicate keys, orphan
 lines, inconsistent dates/customers, null amounts, missing columns and altered totals. Regression tests also cover the observed comment-line
-default date and rejection of financial sentinel dates, null dates and other mismatches.
+default date, blank/null comment customer inheritance, and rejection of financial
+sentinel dates, null dates and unrelated date/customer mismatches.
 Notebook structure and every code cell were also validated locally.
 
 Fabric lakehouse permissions, Delta source access, destination writes and audit

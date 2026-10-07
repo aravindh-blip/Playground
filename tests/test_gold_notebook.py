@@ -131,3 +131,38 @@ def test_comment_date_exception_remains_narrow(ctx,line_type,line_date):
            .withColumn('posting_date',F.lit(line_date).cast('timestamp')))
     with pytest.raises(ValueError,match='posting dates differ'):
         ctx.ns['build_document'](lines,s['sales_invoice_header'],'INVOICE')
+
+
+@pytest.mark.parametrize('blank,line_date',[
+    ('',datetime(2024,2,29)),
+    (None,datetime(2024,2,29)),
+    ('  ',datetime(1753,1,1)),
+])
+def test_blank_comment_customers_inherit_header_independently_of_date(ctx,blank,line_date):
+    s=sources(ctx)
+    lines=(s['sales_invoice_line'].filter("document_no = 'A' AND line_no = 1")
+           .withColumn('type',F.lit(0))
+           .withColumn('posting_date',F.lit(line_date))
+           .withColumn('bill_to_customer_no',F.lit(blank).cast('string'))
+           .withColumn('sell_to_customer_no',F.lit(blank).cast('string')))
+    fact=ctx.ns['build_document'](lines,s['sales_invoice_header'],'INVOICE')
+    row=fact.first()
+    assert row.bill_to_customer_key=='K:C1'
+    assert row.sell_to_customer_key=='K:C1'
+    assert row.bill_to_customer_defaulted is True
+    assert row.sell_to_customer_defaulted is True
+    assert row.source_line_bill_to_customer_no==blank
+    assert row.source_line_sell_to_customer_no==blank
+    assert row.line_posting_date_defaulted==(line_date.year==1753)
+    ctx.ns['reconcile_document'](lines,s['sales_invoice_header'],fact,'INVOICE')
+
+
+@pytest.mark.parametrize('field',['bill_to_customer_no','sell_to_customer_no'])
+@pytest.mark.parametrize('line_type,value',[(2,''),(2,None),(0,'WRONG')])
+def test_customer_inheritance_does_not_hide_other_mismatches(ctx,field,line_type,value):
+    s=sources(ctx)
+    lines=(s['sales_invoice_line'].filter("document_no = 'A' AND line_no = 1")
+           .withColumn('type',F.lit(line_type))
+           .withColumn(field,F.lit(value).cast('string')))
+    with pytest.raises(ValueError,match=field+' differs'):
+        ctx.ns['build_document'](lines,s['sales_invoice_header'],'INVOICE')
